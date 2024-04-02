@@ -1,4 +1,4 @@
-from flask import Flask, redirect, request, session
+from flask import Flask, redirect, request, session, jsonify
 import requests
 import base64
 
@@ -30,19 +30,29 @@ def callback():
         'grant_type': 'authorization_code',
         'code': code,
         'redirect_uri': redirect_uri,
+        'scopes': scope
     }
     client_creds_b64 = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     headers = {
         'Authorization': f"Basic {client_creds_b64}",
         'Content-Type': 'application/x-www-form-urlencoded',
     }
-    token_response = requests.post(token_url, data=token_data, headers=headers)
+    token_response = requests.post(token_url, data=token_data, headers=headers, verify=True)
     token_response_data = token_response.json()
     access_token = token_response_data.get('access_token')
 
     session['access_token'] = access_token  # Store the token in the session
     return redirect('/top-items')
 
+# Get the speicifc audio features for each of the tracks
+def get_audio_features_for_tracks(track_ids, access_token):
+    headers = {'Authorization': f'Bearer {access_token}'}
+    track_ids_str = ','.join(track_ids)
+    response = requests.get(f'{base_url}/audio-features?ids={track_ids_str}', headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {'error': 'Failed to fetch audio features', 'status_code': response.status_code}
 
 @app.route('/top-items')
 def top_items():
@@ -50,15 +60,18 @@ def top_items():
     if access_token is None:
         return redirect('/')
 
-    headers = {
-        'Authorization': f"Bearer {access_token}",
-    }
-    response = requests.get(f"{base_url}/me/top/artists", headers=headers)
+    headers = {'Authorization': f'Bearer {access_token}'}
+    response = requests.get(f"{base_url}/me/top/tracks", headers=headers)
     if response.status_code != 200:
-        return 'Could not fetch', response.status_code
+        return jsonify({'error': 'Could not fetch top tracks', 'status_code': response.status_code})
 
-    current_track = response.json()
-    return current_track
+    # Get Track IDs for each of users top songs
+    track_ids = [track['id'] for track in response.json().get('items', [])]
+
+    # Now get audio features for these tracks
+    audio_features = get_audio_features_for_tracks(track_ids, access_token)
+    
+    return jsonify(audio_features)
 
 
 if __name__ == '__main__':
