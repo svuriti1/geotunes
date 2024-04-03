@@ -6,6 +6,7 @@ app = Flask(__name__)
 app.secret_key = 'YOUR_SECRET_KEY'  # Choose a secret key for session management
 
 # Spotify OAuth settings
+# Should put the client_id and secret in a .env file when we're done 
 client_id = 'f7c9aceb42184fa8bfd9cd928ffcd84e'
 client_secret = 'a4b3f8f3d1ab4a098f532917bde15f28'
 redirect_uri = 'http://127.0.0.1:5000/callback'
@@ -44,8 +45,31 @@ def callback():
     session['access_token'] = access_token  # Store the token in the session
     return redirect('/top-items')
 
+# Function to get song IDs by name for scraped songs so that we can get their audio featues after
+# Once we read the songs from the scraped songs, we can call this function
+# Query needs to be structured like this: 'track:"Nice For What" artist:Drake'
+def track_search(query, access_token):
+    base_url = "https://api.spotify.com/v1/search"
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+    }
+    params = {
+        'q': query,
+        'type': 'track',
+        'limit': 1,
+    }
+    response = requests.get(base_url, headers=headers, params=params)
+    if response.status_code == 200:
+        tracks = response.json().get('tracks', {}).get('items', [])
+        if tracks:
+            return tracks[0]['id']
+        else:
+            return "No track found."
+    else:
+        return f"Error: {response.status_code}"
+
 # Get the speicifc audio features for each of the tracks
-def get_audio_features_for_tracks(track_ids, access_token):
+def track_audio_features(track_ids, access_token):
     headers = {'Authorization': f'Bearer {access_token}'}
     track_ids_str = ','.join(track_ids)
     response = requests.get(f'{base_url}/audio-features?ids={track_ids_str}', headers=headers)
@@ -69,7 +93,7 @@ def top_items():
     track_ids = [track['id'] for track in response.json().get('items', [])]
 
     # Now get audio features for these tracks
-    audio_features = get_audio_features_for_tracks(track_ids, access_token)
+    audio_features = track_audio_features(track_ids, access_token)
     
     return jsonify(audio_features)
 
