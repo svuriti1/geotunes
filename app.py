@@ -72,7 +72,7 @@ def track_search(query, access_token):
     else:
         return f"Error: {response.status_code}"
 
-# Get the speicifc audio features for each of the tracks
+# Get the specific audio features for each of the tracks
 def track_audio_features(track_ids, access_token):
     headers = {'Authorization': f'Bearer {access_token}'}
     track_ids_str = ','.join(track_ids)
@@ -97,9 +97,18 @@ def get_similarities(user_audio_features, country_audio_features):
         country_matrix[i] = np.array([
             track['danceability'], track['energy'], track['valence'], track['tempo']
         ])
-    # Normalizing the matrices lowkey idk if I wanna keep this
-    norm_user = np.linalg.norm(user_matrix, axis=0, keepdims=True)
-    norm_country = np.linalg.norm(country_matrix, axis=0, keepdims=True)
+    
+    # Standardizing the matrices
+    user_matrix_mean = user_matrix.mean(axis=0)
+    user_matrix_std = user_matrix.std(axis=0)
+    user_matrix = (user_matrix - user_matrix_mean) / user_matrix_std
+    country_matrix_mean = country_matrix.mean(axis=0)
+    country_matrix_std = country_matrix.std(axis=0)
+    country_matrix = (country_matrix - country_matrix_mean) / country_matrix_std
+
+    # Normalizing the matrices
+    norm_user = np.linalg.norm(user_matrix, axis=1, keepdims=True)
+    norm_country = np.linalg.norm(country_matrix, axis=1, keepdims=True)
     user_matrix = user_matrix / norm_user
     country_matrix = country_matrix / norm_country
 
@@ -140,7 +149,7 @@ def top_items():
 
 @app.route('/country-charts')
 def country_charts():
-    country_name = 'japan' # request.args.get('country')
+    country_name = 'romania' # request.args.get('country')
     directory_path = "bilboard_charts"  # Directory where CSV files are stored
     # Search for files in the directory that contain the country name in their filename
     search_pattern = os.path.join(directory_path, f"*{country_name}*.csv")
