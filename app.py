@@ -2,6 +2,7 @@ from flask import Flask, redirect, request, session, jsonify
 import requests
 import base64
 import pandas as pd 
+import numpy as np
 from glob import glob
 import os 
 
@@ -46,7 +47,7 @@ def callback():
     access_token = token_response_data.get('access_token')
 
     session['access_token'] = access_token  # Store the token in the session
-    return redirect('/country-charts')
+    return redirect('/top-items')
 
 # Function to get song IDs by name for scraped songs so that we can get their audio featues after
 # Once we read the songs from the scraped songs, we can call this function
@@ -80,6 +81,35 @@ def track_audio_features(track_ids, access_token):
         return response.json()
     else:
         return {'error': 'Failed to fetch audio features', 'status_code': response.status_code}
+    
+def get_similarities(user_audio_features, country_audio_features):
+    # Clean up country audio features
+    country_audio_features['audio_features'] = [feature for feature in country_audio_features['audio_features'] if feature is not None]
+    
+    user_matrix = np.zeros((len(user_audio_features['audio_features']), 4))
+    country_matrix = np.zeros((len(country_audio_features['audio_features']), 4))
+    for i, track in enumerate(user_audio_features['audio_features']):
+        user_matrix[i] = np.array([
+            track['danceability'], track['energy'], track['valence'], track['tempo']
+        ])
+    for i, track in enumerate(country_audio_features['audio_features']):
+        country_matrix[i] = np.array([
+            track['danceability'], track['energy'], track['valence'], track['tempo']
+        ])
+    # Normalizing the matrices
+    # norm_user = np.linalg.norm(user_matrix, axis=0, keepdims=True)
+    # norm_country = np.linalg.norm(country_matrix, axis=0, keepdims=True)
+    # user_matrix = user_matrix / norm_user
+    # country_matrix = country_matrix / norm_country
+
+    similarity_scores = np.dot(user_matrix, country_matrix.T)
+    best_pair_indices = np.unravel_index(np.argmax(similarity_scores), similarity_scores.shape)
+    best_pair = {
+        'user_song': user_audio_features['audio_features'][best_pair_indices[0]],
+        'country_song': country_audio_features['audio_features'][best_pair_indices[1]]
+    }
+
+    return best_pair
 
 @app.route('/top-items')
 def top_items():
@@ -96,13 +126,18 @@ def top_items():
     track_ids = [track['id'] for track in response.json().get('items', [])]
 
     # Now get audio features for these tracks
-    audio_features = track_audio_features(track_ids, access_token)
+    user_audio_features = track_audio_features(track_ids, access_token)
+
+    country_audio_features = country_charts()
+
+    # Calculating similar tracks
+    similar_tracks = get_similarities(user_audio_features, country_audio_features)
     
-    return jsonify(audio_features)
+    return jsonify(similar_tracks)
 
 @app.route('/country-charts')
 def country_charts():
-    country_name = 'australia' # request.args.get('country')
+    country_name = 'japan' # request.args.get('country')
     directory_path = "bilboard_charts"  # Directory where CSV files are stored
     # Search for files in the directory that contain the country name in their filename
     search_pattern = os.path.join(directory_path, f"*{country_name}*.csv")
@@ -129,7 +164,7 @@ def country_charts():
 
     # Now get Audio features for those songs
     audio_features = track_audio_features(track_ids, access_token)
-    return jsonify(audio_features)
+    return audio_features
 
 if __name__ == '__main__':
     app.run(debug=True)
