@@ -1,6 +1,9 @@
 from flask import Flask, redirect, request, session, jsonify
 import requests
 import base64
+import pandas as pd 
+from glob import glob
+import os 
 
 app = Flask(__name__)
 app.secret_key = 'YOUR_SECRET_KEY'  # Choose a secret key for session management
@@ -43,7 +46,7 @@ def callback():
     access_token = token_response_data.get('access_token')
 
     session['access_token'] = access_token  # Store the token in the session
-    return redirect('/top-items')
+    return redirect('/country-charts')
 
 # Function to get song IDs by name for scraped songs so that we can get their audio featues after
 # Once we read the songs from the scraped songs, we can call this function
@@ -97,6 +100,36 @@ def top_items():
     
     return jsonify(audio_features)
 
+@app.route('/country-charts')
+def country_charts():
+    country_name = 'australia' # request.args.get('country')
+    directory_path = "bilboard_charts"  # Directory where CSV files are stored
+    # Search for files in the directory that contain the country name in their filename
+    search_pattern = os.path.join(directory_path, f"*{country_name}*.csv")
+    file_list = glob(search_pattern)
+
+    if not file_list:
+        return jsonify({'error': 'No CSV file found for the specified country'}), 404
+
+    csv_file = file_list[0]
+    df = pd.read_csv(csv_file)
+    
+    access_token = session.get('access_token')
+    if access_token is None:
+        return redirect('/')
+
+    # Get Spotify track IDs for each song in the CSV
+    track_ids = []
+    for index, row in df.iterrows():
+        song_name = row['Title']
+        artist_name = row['Artist']
+        query = f'track:"{song_name}" artist:{artist_name}'
+        track_id = track_search(query, access_token)
+        track_ids.append(track_id)
+
+    # Now get Audio features for those songs
+    audio_features = track_audio_features(track_ids, access_token)
+    return jsonify(audio_features)
 
 if __name__ == '__main__':
     app.run(debug=True)
