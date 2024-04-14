@@ -86,6 +86,7 @@ def get_similarities(user_audio_features, country_audio_features):
     # Clean up country audio features
     country_audio_features['audio_features'] = [feature for feature in country_audio_features['audio_features'] if feature is not None]
     
+    # Creating matrices for the user songs and country songs
     user_matrix = np.zeros((len(user_audio_features['audio_features']), 4))
     country_matrix = np.zeros((len(country_audio_features['audio_features']), 4))
     for i, track in enumerate(user_audio_features['audio_features']):
@@ -96,12 +97,13 @@ def get_similarities(user_audio_features, country_audio_features):
         country_matrix[i] = np.array([
             track['danceability'], track['energy'], track['valence'], track['tempo']
         ])
-    # Normalizing the matrices
-    # norm_user = np.linalg.norm(user_matrix, axis=0, keepdims=True)
-    # norm_country = np.linalg.norm(country_matrix, axis=0, keepdims=True)
-    # user_matrix = user_matrix / norm_user
-    # country_matrix = country_matrix / norm_country
+    # Normalizing the matrices lowkey idk if I wanna keep this
+    norm_user = np.linalg.norm(user_matrix, axis=0, keepdims=True)
+    norm_country = np.linalg.norm(country_matrix, axis=0, keepdims=True)
+    user_matrix = user_matrix / norm_user
+    country_matrix = country_matrix / norm_country
 
+    # Multiplying the matrices and grabbing the user, country song pair with the highest similarity
     similarity_scores = np.dot(user_matrix, country_matrix.T)
     best_pair_indices = np.unravel_index(np.argmax(similarity_scores), similarity_scores.shape)
     best_pair = {
@@ -128,6 +130,7 @@ def top_items():
     # Now get audio features for these tracks
     user_audio_features = track_audio_features(track_ids, access_token)
 
+    # Get audio features for the songs of the country
     country_audio_features = country_charts()
 
     # Calculating similar tracks
