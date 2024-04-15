@@ -149,7 +149,8 @@ def top_items():
     user_audio_features = track_audio_features(track_ids, access_token)
 
     # Calculating similar tracks
-    similar_tracks, mean_audio_features = get_similarities(user_audio_features, 'india')
+    # change india to what the user clicks on
+    similar_tracks, mean_audio_features = get_similarities(user_audio_features, 'india') 
 
     # Getting Recommendations
     recommendations = get_recommendations(
