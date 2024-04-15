@@ -1,10 +1,12 @@
-from flask import Flask, redirect, request, session, jsonify
+from flask import Flask, redirect, request, session, jsonify, render_template
 import requests
 import base64
+import ast
 import pandas as pd 
 import numpy as np
 from glob import glob
 import os 
+
 
 app = Flask(__name__)
 app.secret_key = 'YOUR_SECRET_KEY'  # Choose a secret key for session management
@@ -25,7 +27,7 @@ base_url = 'https://api.spotify.com/v1'
 @app.route('/')
 def home():
     auth_url = f"{oauth_url}?response_type=code&client_id={client_id}&scope={scope[0]}&redirect_uri={redirect_uri}"
-    return f'<h2><a href="{auth_url}">Sign in with Spotify</a></h2>'
+    return render_template('index.html', auth_url=auth_url)
 
 
 @app.route('/callback')
@@ -82,9 +84,16 @@ def track_audio_features(track_ids, access_token):
     else:
         return {'error': 'Failed to fetch audio features', 'status_code': response.status_code}
     
-def get_similarities(user_audio_features, country_audio_features):
-    # Clean up country audio features
-    country_audio_features['audio_features'] = [feature for feature in country_audio_features['audio_features'] if feature is not None]
+def get_similarities(user_audio_features, country):
+    directory_path = 'country_audio_features'
+    search_pattern = os.path.join(directory_path, f"*{country}*.csv")
+    file_list = glob(search_pattern)
+    
+    csv_file = file_list[0]
+
+    country_audio_features = pd.read_csv(csv_file)
+ 
+    country_audio_features = country_audio_features.dropna()
     
     # Creating matrices for the user songs and country songs
     user_matrix = np.zeros((len(user_audio_features['audio_features']), 4))
@@ -94,6 +103,7 @@ def get_similarities(user_audio_features, country_audio_features):
             track['danceability'], track['energy'], track['valence'], track['tempo']
         ])
     for i, track in enumerate(country_audio_features['audio_features']):
+        track = ast.literal_eval(track)
         country_matrix[i] = np.array([
             track['danceability'], track['energy'], track['valence'], track['tempo']
         ])
@@ -116,11 +126,10 @@ def get_similarities(user_audio_features, country_audio_features):
     similarity_scores = np.dot(user_matrix, country_matrix.T)
     best_pair_indices = np.unravel_index(np.argmax(similarity_scores), similarity_scores.shape)
     best_pair = {
-        'user_song': user_audio_features['audio_features'][best_pair_indices[0]],
-        'country_song': country_audio_features['audio_features'][best_pair_indices[1]]
+        'country_song': ast.literal_eval(country_audio_features.iloc[best_pair_indices[1]]['audio_features'])
     }
 
-    return best_pair
+    return best_pair, user_matrix_mean
 
 @app.route('/top-items')
 def top_items():
@@ -139,44 +148,81 @@ def top_items():
     # Now get audio features for these tracks
     user_audio_features = track_audio_features(track_ids, access_token)
 
-    # Get audio features for the songs of the country
-    country_audio_features = country_charts()
-
     # Calculating similar tracks
-    similar_tracks = get_similarities(user_audio_features, country_audio_features)
-    
-    return jsonify(similar_tracks)
+    similar_tracks, mean_audio_features = get_similarities(user_audio_features, 'india')
 
-@app.route('/country-charts')
+    # Getting Recommendations
+    recommendations = get_recommendations(
+        similar_tracks['country_song']['id'], 
+        mean_audio_features[3],
+        mean_audio_features[1],
+        mean_audio_features[0],
+        mean_audio_features[2]
+    )
+
+    songs = {}
+    for rec in recommendations['tracks']:
+        songs[rec['id']] = {
+            'name': rec['name'],
+            'artists': []
+        }
+        for artist in rec['artists']:
+            songs[rec['id']]['artists'].append(artist['name'])
+    
+    return jsonify(songs)
+
 def country_charts():
-    country_name = 'romania' # request.args.get('country')
-    directory_path = "bilboard_charts"  # Directory where CSV files are stored
-    # Search for files in the directory that contain the country name in their filename
-    search_pattern = os.path.join(directory_path, f"*{country_name}*.csv")
-    file_list = glob(search_pattern)
+    directory_path = "bilboard_charts"
+    output_directory = "country_audio_features"
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)  
 
-    if not file_list:
-        return jsonify({'error': 'No CSV file found for the specified country'}), 404
+    files = os.listdir(directory_path)
 
-    csv_file = file_list[0]
-    df = pd.read_csv(csv_file)
-    
+    for csv_file in files:
+        df = pd.read_csv(csv_file)
+        access_token = session.get('access_token')
+        if access_token is None:
+            return redirect('/')
+
+        track_ids = []
+        for _, row in df.iterrows():
+            song_name = row['Title']
+            artist_name = row['Artist']
+            query = f'track:"{song_name}" artist:{artist_name}'
+            track_id = track_search(query, access_token)
+            if track_id:
+                track_ids.append(track_id)
+
+        audio_features = track_audio_features(track_ids, access_token)
+
+        if audio_features:
+            new_df = pd.DataFrame(audio_features)
+            country_name = os.path.basename(csv_file).split('-')[0]
+            new_df.to_csv(f'{output_directory}/{country_name}_audio_features.csv', index=False)
+
+    return jsonify({'message': 'Audio features collected for all countries.'})
+
+
+def get_recommendations(seed_tracks, target_tempo, target_energy, target_danceability, target_valence):
     access_token = session.get('access_token')
-    if access_token is None:
-        return redirect('/')
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+    params = {
+        'seed_tracks': seed_tracks,
+        'target_tempo': target_tempo,
+        'target_energy': target_energy,
+        'target_danceability': target_danceability,
+        'target_valence': target_valence,
+        'limit': 10  
+    }
 
-    # Get Spotify track IDs for each song in the CSV
-    track_ids = []
-    for index, row in df.iterrows():
-        song_name = row['Title']
-        artist_name = row['Artist']
-        query = f'track:"{song_name}" artist:{artist_name}'
-        track_id = track_search(query, access_token)
-        track_ids.append(track_id)
+    response = requests.get(f"{base_url}/recommendations", headers=headers, params=params)
+    if response.status_code != 200:
+        return jsonify({'error': 'Could not get recommendations', 'status_code': response.status_code})
 
-    # Now get Audio features for those songs
-    audio_features = track_audio_features(track_ids, access_token)
-    return audio_features
+    return response.json()
 
 if __name__ == '__main__':
     app.run(debug=True)
