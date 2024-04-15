@@ -42,7 +42,7 @@ def main():
                     else:
                         artist_name = stuff[2].text.strip()
                         song_name = ""
-                    with open('data.csv','a') as df:
+                    with open('top40-charts-data.csv','a') as df:
                         List = [count, song_name, artist_name, sys.argv[2], date]
                         writer_object = writer(df)
                         writer_object.writerow(List)
