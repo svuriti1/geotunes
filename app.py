@@ -9,7 +9,7 @@ import os
 
 
 app = Flask(__name__)
-app.secret_key = 'YOUR_SECRET_KEY'  # Choose a secret key for session management
+app.secret_key = 'YOUR_SECRET_KEY'  
 
 # Spotify OAuth settings
 # Should put the client_id and secret in a .env file when we're done 
@@ -23,12 +23,13 @@ oauth_url = 'https://accounts.spotify.com/authorize'
 token_url = 'https://accounts.spotify.com/api/token'
 base_url = 'https://api.spotify.com/v1'
 
-
 @app.route('/')
 def home():
-    auth_url = f"{oauth_url}?response_type=code&client_id={client_id}&scope={scope[0]}&redirect_uri={redirect_uri}"
-    return render_template('index.html', auth_url=auth_url)
-
+    if 'access_token' in session:
+        return redirect('/map')
+    else:
+        auth_url = f"{oauth_url}?response_type=code&client_id={client_id}&scope={scope[0]}&redirect_uri={redirect_uri}"
+        return render_template('index.html', auth_url=auth_url)
 
 @app.route('/callback')
 def callback():
@@ -36,20 +37,24 @@ def callback():
     token_data = {
         'grant_type': 'authorization_code',
         'code': code,
-        'redirect_uri': redirect_uri,
-        'scopes': scope
+        'redirect_uri': redirect_uri
     }
     client_creds_b64 = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     headers = {
         'Authorization': f"Basic {client_creds_b64}",
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/x-www-form-urlencoded'
     }
-    token_response = requests.post(token_url, data=token_data, headers=headers, verify=True)
+    token_response = requests.post(token_url, data=token_data, headers=headers)
     token_response_data = token_response.json()
     access_token = token_response_data.get('access_token')
+    session['access_token'] = access_token
+    return redirect('/map')
 
-    session['access_token'] = access_token  # Store the token in the session
-    return redirect('/top-items')
+@app.route('/map')
+def map_page():
+    if 'access_token' not in session:
+        return redirect('/')
+    return render_template('map.html') 
 
 # Function to get song IDs by name for scraped songs so that we can get their audio featues after
 # Once we read the songs from the scraped songs, we can call this function
@@ -131,8 +136,8 @@ def get_similarities(user_audio_features, country):
 
     return best_pair, user_matrix_mean
 
-@app.route('/top-items')
-def top_items():
+@app.route('/top-items/<country>')
+def top_items(country):
     access_token = session.get('access_token')
     if access_token is None:
         return redirect('/')
@@ -142,35 +147,33 @@ def top_items():
     if response.status_code != 200:
         return jsonify({'error': 'Could not fetch top tracks', 'status_code': response.status_code})
 
-    # Get Track IDs for each of users top songs
+    # Get Track IDs for each of user's top songs
     track_ids = [track['id'] for track in response.json().get('items', [])]
 
-    # Now get audio features for these tracks
+    # Get audio features for these tracks
     user_audio_features = track_audio_features(track_ids, access_token)
 
-    # Calculating similar tracks
-    # change india to what the user clicks on
-    similar_tracks, mean_audio_features = get_similarities(user_audio_features, 'india') 
+    # Get similar tracks based on country user clicked on
+    similar_tracks, mean_audio_features = get_similarities(user_audio_features, country.lower()) 
 
     # Getting Recommendations
     recommendations = get_recommendations(
-        similar_tracks['country_song']['id'], 
-        mean_audio_features[3],
-        mean_audio_features[1],
-        mean_audio_features[0],
-        mean_audio_features[2]
+        similar_tracks['country_song']['id'],
+        mean_audio_features[3],  # tempo
+        mean_audio_features[1],  # energy
+        mean_audio_features[0],  # danceability
+        mean_audio_features[2]   # valence
     )
 
     songs = {}
     for rec in recommendations['tracks']:
         songs[rec['id']] = {
             'name': rec['name'],
-            'artists': []
+            'artists': [artist['name'] for artist in rec['artists']]
         }
-        for artist in rec['artists']:
-            songs[rec['id']]['artists'].append(artist['name'])
     
     return jsonify(songs)
+
 
 def country_charts():
     directory_path = "bilboard_charts"

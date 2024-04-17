@@ -1,84 +1,12 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>World Music Map</title>
-    <style>
-        #world-map {
-            height: 600px;
-        }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in to GeoTunes</title>
 </head>
 <body>
-    <h1>Geooooootuneeeees</h1>
+    <h1>Welcome to GeoTunes!</h1>
     <h2><a href="{{ auth_url }}">Sign in with Spotify</a></h2>
-    <div id="world-map"></div>
-
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDEDO7TiR-ym1z0cGjLuk8ZqEpZDTzhwlQ&callback=initMap" async defer></script>
-    <script>
-        var map;
-
-        function initMap() {
-            map = new google.maps.Map(document.getElementById('world-map'), {
-                center: { lat: 20, lng: 0 },
-                zoom: 2
-            });
-
-            // Sample data for demonstration (replace with actual data)
-            var countriesData = {
-                "US": [
-                    { lat: 49.3457868, lng: -124.7844079 },
-                    { lat: 49.3457868, lng: -66.9513812 },
-                    { lat: 24.396308, lng: -66.9513812 },
-                    { lat: 24.396308, lng: -124.7844079 }
-                ],
-                "UK": [
-                    { lat: 59.3604721, lng: -8.3280581 },
-                    { lat: 59.3604721, lng: 1.7687322 },
-                    { lat: 49.9023718, lng: 1.7687322 },
-                    { lat: 49.9023718, lng: -8.3280581 }
-                ],
-                // Add more countries and their coordinates here
-            };
-
-            for (var country in countriesData) {
-                var countryCoords = countriesData[country].map(coord => new google.maps.LatLng(coord.lat, coord.lng));
-
-                var countryPolygon = new google.maps.Polygon({
-                    paths: countryCoords,
-                    strokeColor: '#FF0000',
-                    strokeOpacity: 0.8,
-                    strokeWeight: 2,
-                    fillColor: '#FF0000',
-                    fillOpacity: 0.35,
-                    countryName: country
-                });
-
-                countryPolygon.setMap(map);
-
-                // Add click event to each country polygon
-                google.maps.event.addListener(countryPolygon, 'click', function (event) {
-                    var country_code = this.countryName;
-                    
-                    // Fetch top songs for the clicked country
-                    fetch(`/top-items/${country_code}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        var songsHtml = data.map(song => `<li>${song.name} - ${song.artists.join(', ')}</li>`).join('');
-                        var content = `<h3>Top Songs in ${country_code}</h3><ul>${songsHtml}</ul>`;
-                        
-                        // Display popup with top songs
-                        new google.maps.InfoWindow({
-                            content: content,
-                            position: event.latLng
-                        }).open(map);
-                    })
-                    .catch(error => {
-                        console.error('Error fetching top songs:', error);
-                        alert('Error fetching top songs. Please try again.');
-                    });
-                });
-            }
-        }
-    </script>
 </body>
 </html>
