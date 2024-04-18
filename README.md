@@ -33,4 +33,4 @@ Once you have everything installed, in your terminal simple run:
 ```bash
 flask run
 ```
-Click on the link for the localhost and you're all set! If you are having trouble when clicking on a country on the map, please reach out to us so we can add you as an authorized user for the application. s
+Click on the link for the localhost and you're all set! If you are having trouble when clicking on a country on the map, please reach out to us so we can add you as an authorized user for the application.
