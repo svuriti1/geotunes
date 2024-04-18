@@ -3,17 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>World Music Map</title>
+    <title>GeoTunes</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #000000;
+            margin: 0;
+            padding: 0;
+            color: #ffffff;
+            text-align: center;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5em 1em;
+            background-color: #000000;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,.3);
+        }
+        .logo {
+            height: 50px; 
+        }
+        .title {
+            flex-grow: 1;
+            text-align: center;
+            font-weight: 700;
+        }
+        .info-icon {
+            font-size: 1.5em; 
+            cursor: pointer;
+            color: white;
+        }
+        .header h1 {
+            margin: 0;
+            font-weight: 700;
+            font-size: 40px;
+        }
         #mapid {
             height: 600px;
+            width: 100%;
+            box-shadow: 0 2px 4px rgba(0,0,0,.3);
+        }
+        .leaflet-popup-content-wrapper {
+            font-family: 'Roboto', sans-serif;
+        }
+        .leaflet-popup-content h3 {
+            margin: 0 0 10px 0;
+            color: #1DB954;
+            font-weight: 700;
+        }
+        .leaflet-popup-content ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .leaflet-popup-content li {
+            margin: 5px 0;
+            font-size: 0.9em;
         }
     </style>
 </head>
 <body>
-    <h1>GeoTunes World Map</h1>
+    <div class="header">
+        <img class="logo" src="../static/geotunes-logo-dark.png" alt="GeoTunes Logo">
+
+        <h1 class="title">GeoTunes</h1>
+
+        <div class="info-icon" onclick="openInfoPopup();">
+            <i class="fas fa-info-circle"></i>
+        </div>
+    </div>
     <div id="mapid"></div>
     <script>
         var map = L.map('mapid').setView([20, 0], 2); // Set the initial view of the map
@@ -26,22 +88,35 @@
 
         // Function to handle click on country
         function onCountryClick(e) {
-            var layer = e.target;
-            var countryName = layer.feature.properties.name;
-            console.log("Country clicked:", countryName);
+    var layer = e.target;
+    var countryName = layer.feature.properties.name;
+    console.log("Country clicked:", countryName);
 
-            // Fetching top items from backend 
-            fetch(`/top-items/${countryName}`)
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Top songs data:', data);
-                    console.log(`Top Songs in ${countryName}:\n` + JSON.stringify(data, null, 2));
-                })
-                .catch(error => {
-                    console.error('Error fetching top songs:', error);
-                    alert('Error fetching top songs.');
-                });
-        }
+    // Fetching top items from backend 
+    fetch(`/top-items/${countryName}`)
+        .then(response => response.json())
+        .then(data => {
+            // Create content for the popup
+            var popupContent = '<h3>Top Songs in ' + countryName + ':</h3><ul>';
+            for (var trackId in data) {
+                var song = data[trackId];
+                var songTitle = song.name;
+                var songArtists = song.artists.join(", ");
+                popupContent += '<li>' + songTitle + ' - ' + songArtists + '</li>';
+            }
+            popupContent += '</ul>';
+
+            layer.bindPopup(popupContent, {
+                closeButton: true,
+                offset: L.point(0, -20)
+            }).openPopup();
+        })
+        .catch(error => {
+            console.error('Error fetching top songs:', error);
+            alert('Error fetching top songs.');
+        });
+}
+
 
         // Style for the countries
         var countryStyle = {
@@ -65,6 +140,11 @@
                     }
                 }).addTo(map);
             });
+
+        function openInfoPopup() {
+            alert('Click on any country to see the top songs from that region. You can then listen to these songs on Spotify.');
+            // If you want to use a more advanced modal/popup library, replace the alert with the appropriate function call.
+        }
     </script>
 </body>
 </html>
