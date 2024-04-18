@@ -4,9 +4,64 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign in to GeoTunes</title>
+    <style>
+        /* Add your existing styles plus any additional styles for the introduction text */
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #000000;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            text-align: center;
+            margin: 20px;
+            max-width: 800px; /* Limiting the width for better readability */
+        }
+        h1 {
+            font-size: 3em;
+            margin-bottom: 0.3em;
+        }
+        p.intro {
+            font-size: 1em;
+            line-height: 1.5;
+            margin-bottom: 2em;
+        }
+        a {
+            display: inline-block;
+            font-family: 'Arial', sans-serif;
+            background-color: #1DB954; /* Spotify brand color */
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px rgba(255, 255, 255, 0.1);
+            transition: background-color 0.3s ease;
+        }
+        a:hover {
+            background-color: #1ED760; /* Slightly lighter Spotify brand color for hover effect */
+        }
+        .logo {
+            margin-bottom: 1em; /* Adjust spacing as needed */
+            width: 250px;
+            height: 210px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Welcome to GeoTunes!</h1>
-    <h2><a href="{{ auth_url }}">Sign in with Spotify</a></h2>
+    <div class="container">
+        <img class="logo" src="../static/geotunes-logo-dark.png" alt="GeoTunes Logo">
+        <h1>Welcome to GeoTunes!</h1>
+        <p class="intro">
+            GeoTunes is your global music discovery platform! Our interactive map lets you click on countries to unlock a curated selection of top songs from each region for YOU, giving a taste of the diverse musical landscapes across the globe. Whether you're a traveler, a music enthusiast, or someone looking to expand your playlist, GeoTunes offers an immersive way to discover music from different cultures and genres.
+        </p>
+        <h2><a href="{{ auth_url }}">Sign in with Spotify</a></h2>
+    </div>
 </body>
 </html>
+
