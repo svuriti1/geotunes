@@ -167,9 +167,14 @@ def top_items(country):
 
     songs = {}
     for rec in recommendations['tracks']:
+        song_link = rec['external_urls']['spotify'] if 'external_urls' in rec else None
+        album_image_url = rec['album']['images'][0]['url'] if rec['album']['images'] else None
+
         songs[rec['id']] = {
             'name': rec['name'],
-            'artists': [artist['name'] for artist in rec['artists']]
+            'artists': [artist['name'] for artist in rec['artists']],
+            'song_link': song_link,
+            'album_image': album_image_url
         }
     
     return jsonify(songs)

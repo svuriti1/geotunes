@@ -64,6 +64,33 @@
             margin: 5px 0;
             font-size: 0.9em;
         }
+        .popup-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .popup-item img {
+            width: 50px; /* Set the image size */
+            height: 50px;
+            margin-right: 10px;
+            object-fit: cover; /* Ensures the image covers the area without stretching */
+        }
+        .popup-item-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .popup-item-title {
+            font-weight: bold;
+            margin: 0;
+            text-decoration: none;
+        }
+        .popup-item-title:hover {
+            color: #40E0D0; /* Color when hovered */
+            text-decoration: underline; /* Adds underline on hover if desired */
+        }
+        .popup-item-artist {
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -86,64 +113,109 @@
             attribution: 'Map data © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // Function to handle click on country
-        function onCountryClick(e) {
-    var layer = e.target;
-    var countryName = layer.feature.properties.name;
-    console.log("Country clicked:", countryName);
-
-    // Fetching top items from backend 
-    fetch(`/top-items/${countryName}`)
-        .then(response => response.json())
-        .then(data => {
-            // Create content for the popup
-            var popupContent = '<h3>Top Songs in ' + countryName + ':</h3><ul>';
-            for (var trackId in data) {
-                var song = data[trackId];
-                var songTitle = song.name;
-                var songArtists = song.artists.join(", ");
-                popupContent += '<li>' + songTitle + ' - ' + songArtists + '</li>';
-            }
-            popupContent += '</ul>';
-
-            layer.bindPopup(popupContent, {
-                closeButton: true,
-                offset: L.point(0, -20)
-            }).openPopup();
-        })
-        .catch(error => {
-            console.error('Error fetching top songs:', error);
-            alert('Error fetching top songs.');
-        });
-}
-
-
         // Style for the countries
         var countryStyle = {
-            fillColor: 'blue',
+            fillColor: '#F1E5AC',
             weight: 2,
-            opacity: 1,
-            color: 'white', 
-            fillOpacity: 0.7
+            opacity: 1, 
+            fillOpacity: 0.9
         };
 
-        // GeoJSON layer
+        function highlightFeature(e) {
+            var layer = e.target;
+
+            layer.setStyle({
+                weight: 3,
+                color: 'black',
+                dashArray: '',
+                fillOpacity: 0.7
+            });
+
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                layer.bringToFront();
+            }
+        }
+
+        function resetHighlight(e) {
+            geojson.resetStyle(e.target);
+        }
+
+        function onEachFeature(feature, layer) {
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight,
+                click: onCountryClick
+            });
+        }
+
+        // Adding GeoJSON layer
+        var geojson = L.geoJson(null, {
+            style: countryStyle,
+            onEachFeature: onEachFeature
+        }).addTo(map);
+
         fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json')
             .then(response => response.json())
             .then(data => {
-                L.geoJson(data, {
-                    style: countryStyle,
-                    onEachFeature: function (feature, layer) {
-                        layer.on({
-                            click: onCountryClick
-                        });
-                    }
-                }).addTo(map);
+                geojson.addData(data);
             });
+
+        // Function to handle click on country
+        function onCountryClick(e) {
+            var layer = e.target;
+            var countryName = layer.feature.properties.name;
+            if (countryName === "United States of America") {
+                countryName = "USA";
+            } 
+            else if (countryName === "United Kingdom") {
+                countryName = "UK";
+            }
+            else if (countryName === "South Korea") {
+                countryName = "Korea";
+            }
+            else if (countryName === "Czech Republic") {
+                countryName = "Czech";
+            }
+            else if (countryName === "Hong Kong") {
+                countryName = "HongKong";
+            }
+            else if (countryName === "New Zealand") {
+                countryName = "NewZealand";
+            }
+            console.log("Country clicked:", countryName);
+
+            // Fetching top items from backend 
+            fetch(`/top-items/${countryName}`)
+            .then(response => response.json())
+            .then(data => {
+                var popupContent = '<h3>Top Songs for YOU in ' + countryName + ':</h3><ul>';
+                for (var trackId in data) {
+                    var song = data[trackId];
+                    popupContent += `
+                        <div class="popup-item">
+                            <img src="${song.album_image}" alt="Album image">
+                            <div class="popup-item-info">
+                                <a href="${song.song_link}" target="_blank" class="popup-item-title">${song.name}</a>
+                                <div class="popup-item-artist">${song.artists.join(", ")}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                popupContent += '</ul>';
+
+                layer.bindPopup(popupContent, {
+                    closeButton: true,
+                    offset: L.point(0, -20)
+                }).openPopup();
+            })
+            .catch(error => {
+                console.error('Error fetching top songs:', error);
+                alert('Error fetching top songs.');
+            });
+        }
 
         function openInfoPopup() {
             alert('Click on any country to see the top songs from that region. You can then listen to these songs on Spotify.');
-            // If you want to use a more advanced modal/popup library, replace the alert with the appropriate function call.
         }
     </script>
 </body>
